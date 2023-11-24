@@ -5,12 +5,11 @@ const app = express();
 const cors = require("cors");
 const teacherRoutes=require('./routes/Teacher')
 const studentRoutes=require('./routes/Student')
-const AuthTeacher=require('./middlewares/AuthTeacher')
-const AuthStudent=require('./middlewares/AuthStudent')
+
 app.use(express.json());
 app.use(cors())
-app.use("/teacher",AuthTeacher,teacherRoutes)
-app.use("student",AuthStudent,studentRoutes)
+app.use("/teacher",teacherRoutes)
+app.use("student",studentRoutes)
 const multer = require('multer');
 const storage = multer.memoryStorage(); 
 const upload = multer({
