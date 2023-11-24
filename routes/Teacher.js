@@ -1,5 +1,6 @@
 const express=require('express')
 const router=express.router()
+const authenticateJwtTeacher=require('../middlewares/AuthTeacher')
 
 
 
