@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("MONGODB_CONNECTION_STRING")
+}
+
+model Student {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  email             String         @db.String
+  name              String
+  password          String
+  // collegeDetails
+  enrollmentNumber  Int
+  collegeId         String         @db.ObjectId
+  college           College        @relation(fields: [collegeId], references: [id])
+  coursesEnrolledId String         @db.ObjectId
+  courseEnrolled    Course         @relation(fields: [coursesEnrolledId], references: [id])
+  classesJoined     StudentClass[]
+  projectsUploaded  Project[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model College {
+  id        String    @id @default(auto()) @map("_id") @db.ObjectId
+  name      String
+  students  Student[]
+  pincode   Int
+  courses   Course[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Course {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  college          College   @relation(fields: [collegeId], references: [id])
+  studentsEnrolled Student[]
+
+  collegeId String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Class {
+  id          String         @id @default(auto()) @map("_id") @db.ObjectId
+  nameOfClass String
+  teacherId   String         @db.ObjectId
+  teacher     Teacher        @relation(fields: [teacherId], references: [id])
+  inviteToken Int
+  students    StudentClass[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model StudentClass {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  student   Student  @relation(fields: [studentId], references: [id])
+  studentId String   @db.ObjectId
+  class     Class    @relation(fields: [classId], references: [id])
+  classId   String   @db.ObjectId
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Teacher {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  email            String
+  password         String
+  classes          Class[]
+  projectsRecieved Project[]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model Project {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  title        String
+  description  String
+  teacherId    String   @db.ObjectId
+  teacher      Teacher  @relation(fields: [teacherId], references: [id])
+  studentId    String   @db.ObjectId
+  student      Student  @relation(fields: [studentId], references: [id])
+  isPlagarized Boolean
+  isApproved   Boolean
+  tags         String[]
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}

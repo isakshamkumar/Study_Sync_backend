@@ -31,6 +31,17 @@ const StudentRegisterSchema = zod_1.z.object({
     email: zod_1.z.string(),
     courseEnrolled: zod_1.z.string(),
 });
+const StudentLoginSchema = zod_1.z.object({
+    email: zod_1.z.string(),
+    password: zod_1.z
+        .string()
+        .min(3, { message: "Password Must be Minumum of 3 letters " })
+        .max(20, { message: "Password Must be Maximum of 20 letters " }),
+});
+//zod schema for handleGet class function
+const getClassSchema = zod_1.z.object({
+    inviteToken: zod_1.z.string()
+});
 const handleGetStudentMetaData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     //@ts-ignore
     const student = yield models_1.Students.findById(req.student)
@@ -58,7 +69,7 @@ const handleRegisterStudent = (req, res) => __awaiter(void 0, void 0, void 0, fu
             res.status(403).json({ message: "Student already exists" });
         }
         else {
-            console.log('reacher here');
+            console.log("reacher here");
             const collegeDetails = {
                 enrollmentNumber: studentEnrollmentNumber,
                 collegeId,
@@ -85,62 +96,78 @@ const handleRegisterStudent = (req, res) => __awaiter(void 0, void 0, void 0, fu
 });
 exports.handleRegisterStudent = handleRegisterStudent;
 const handleStudentLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { name, email, password } = req.body;
-    const student = yield models_1.Students.findOne({ name, email, password }).populate("collegeDetails.collegeId");
-    if (student) {
-        const token = jsonwebtoken_1.default.sign({ student: student._id }, config_1.SECRETFORSTUDENT, {
-            expiresIn: "1h",
-        });
-        res.status(200).json({ message: "Logged In Successfully", token });
+    try {
+        const { email, password } = StudentLoginSchema.parse(req.body);
+        const student = yield models_1.Students.findOne({ email, password }).populate("collegeDetails.collegeId");
+        if (student) {
+            const token = jsonwebtoken_1.default.sign({ student: student._id }, config_1.SECRETFORSTUDENT, {
+                expiresIn: "1h",
+            });
+            res.status(200).json({ message: "Logged In Successfully", token });
+        }
+        else {
+            res.status(400).json({ message: "Cannot Find Student" });
+        }
     }
-    else {
-        res.status(400).json({ message: "Cannot Find Student" });
+    catch (error) {
+        return res.json({ error });
     }
 });
 exports.handleStudentLogin = handleStudentLogin;
 const handleGetClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { inviteToken } = req.body;
-    ///assuming the invite token will always be unique
-    const availableClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken })
-        .populate("teacher")
-        .populate("students");
-    if (availableClass) {
-        const resClass = {
-            _id: availableClass._id,
-            nameOfClass: availableClass.nameOfClass,
-            //@ts-ignore
-            teacher: availableClass.teacher.name,
-            dateCreated: availableClass.dateCreated,
-            students: availableClass.students,
-        };
-        res.json({ message: "class found", resClass });
+    try {
+        const { inviteToken } = getClassSchema.parse(req.body);
+        ///assuming the invite token will always be unique
+        const availableClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken })
+            .populate("teacher")
+            .populate("students");
+        if (availableClass) {
+            const resClass = {
+                _id: availableClass._id,
+                nameOfClass: availableClass.nameOfClass,
+                //@ts-ignore
+                teacher: availableClass.teacher.name,
+                dateCreated: availableClass.dateCreated,
+                students: availableClass.students,
+            };
+            res.json({ message: "class found", resClass });
+        }
+        else {
+            res.status(400).json({ message: "No Class Found" });
+        }
     }
-    else {
-        res.status(400).json({ message: "No Class Found" });
+    catch (error) {
+        return res.json({ error });
     }
 });
 exports.handleGetClass = handleGetClass;
 const handleJoinClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    const { inviteToken } = req.body;
-    const student = yield models_1.Students.findById(req.student);
-    // console.log(student);
-    if (student) {
-        const foundClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken });
-        // console.log(foundClass);
-        if (!foundClass) {
-            res.status(400).json({ message: "No Class Found" });
+    try {
+        const { inviteToken } = getClassSchema.parse(req.body);
+        const student = yield models_1.Students.findById(req.student);
+        // console.log(student);
+        if (student) {
+            const foundClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken });
+            // console.log(foundClass);
+            if (!foundClass) {
+                res.status(400).json({ message: "No Class Found" });
+            }
+            else {
+                const updatedClass = yield models_1.Classes.findByIdAndUpdate(foundClass._id, { $push: { students: student._id } }, { new: true });
+                const updatedStudent = yield models_1.Students.findByIdAndUpdate(student._id, { $push: { classesJoined: foundClass._id } }, { new: true });
+                res.json({ message: "Class Joined Successfully" });
+            }
         }
         else {
-            const updatedClass = yield models_1.Classes.findByIdAndUpdate(foundClass._id, { $push: { students: student._id } }, { new: true });
-            const updatedStudent = yield models_1.Students.findByIdAndUpdate(student._id, { $push: { classesJoined: foundClass._id } }, { new: true });
-            res.json({ message: "Class Joined Successfully" });
+            res.status(400).json({ message: "No Student Found" });
         }
     }
-    else {
-        res.status(400).json({ message: "No Student Found" });
+    catch (error) {
+        return res.json({ error });
     }
 });
 exports.handleJoinClass = handleJoinClass;
+//first do file upload then create schema
 const handleProjectUpload = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     // req.file contains the uploaded file (PDF)
     // req.body contains other form data (title, description, etc.)

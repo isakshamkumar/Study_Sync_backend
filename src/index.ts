@@ -21,7 +21,7 @@ mongoose.connection.on('error', err => {
 
    async function connectToDatabase() {
     try {
-       await mongoose.connect('mongodb+srv://ksaksham39:StudySync@cluster0.aizzzey.mongodb.net/StudySyncBackendMain');
+       await mongoose.connect(process.env.MONGODB_CONNECTION_STRING || '');
     } catch (error) {
        console.error('Error connecting to MongoDB', error);
     }
