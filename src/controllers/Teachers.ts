@@ -1,6 +1,8 @@
    import { Request, Response } from 'express';
    import { SECRETFORTEACHER } from '../config';
-   import { Classes, Teachers } from '../models';
+ import prisma from '../prisma/Client'
+ import { v4 as uuidv4 } from 'uuid';
+   // import { Classes, Teachers } from '../models';
    import jwt from 'jsonwebtoken';
 
    import { z } from "zod"
@@ -54,22 +56,27 @@ type TeacherCreateClassRequestBody=z.infer<typeof TeacherCreateClassSchema>
    
          try {
             // Use bcrypt
-            const teacher = await Teachers.findOne({ email });
+            const teacher = await prisma?.teacher.findUnique({
+               where: {
+                  email: email,
+               },
+            });
             if (teacher) {
                   return res.status(403).send({ message: "Teacher already exists" });
             } else {
-                  const newTeacher = new Teachers({
-                     name,
-                     password,
-                     email,
-                     college,
-                     dept,
-                     contactNumber,
-                     classes: [],
-                     projectsRecieved: [],
-                  });
-                  await newTeacher.save();
-                  const token = jwt.sign({ teacher: newTeacher._id }, SECRETFORTEACHER, {
+        
+                  const newTeacher= await prisma?.teacher.create({
+                     data:{
+                        name,
+                        password,
+                        email,
+                  
+                        
+                       
+                     }
+                  })
+                  
+                  const token = jwt.sign({ teacher: newTeacher.id }, SECRETFORTEACHER, {
                      expiresIn: '1h',
                   });
                   return res.json({ message: 'Teacher created successfully', token });
@@ -87,10 +94,15 @@ type TeacherCreateClassRequestBody=z.infer<typeof TeacherCreateClassSchema>
    export const handleTeacherLogin=async (req: Request, res: Response) => {
       try {
          const {  password, email }:TeacherLoginRequestBody = TeacherLoginSchema.parse(req.body);
-         const teacher = await Teachers.findOne({ name, password, email }).populate("college");
+         const teacher = await prisma.teacher.findUnique({
+            where:{
+               email,
+               password
+            }
+         })
          if (teacher) {
-            const token = jwt.sign({ teacher: teacher._id }, SECRETFORTEACHER, { expiresIn: '1h' });
-            res.json({ message: "Logged In Successfully", token, college: teacher.college });
+            const token = jwt.sign({ teacher: teacher.id }, SECRETFORTEACHER, { expiresIn: '1h' });
+            res.json({ message: "Logged In Successfully", token });
          } else {
             res.status(403).json({ message: 'Teacher not found' });
          }
@@ -103,17 +115,41 @@ type TeacherCreateClassRequestBody=z.infer<typeof TeacherCreateClassSchema>
       try {
          const { nameOfClass }:TeacherCreateClassRequestBody = TeacherCreateClassSchema.parse( req.body);
       //@ts-ignore
-      const teacher = req.teacher;
+      const teacherId = req.teacher;
       if (!nameOfClass) {
          return res.status(500).send("Please enter the details");
       };
-      const inviteTokens = `${Math.round(Math.random() * 100)}`;
+      const inviteToken = Number( uuidv4() )
       let dateCreated = `${new Date()}`;
-      const newClass = new Classes({ nameOfClass, teacher, dateCreated, students: [], inviteTokens });
+      const newClass = await prisma.class.create({
+         data:{
+            nameOfClass,
+            inviteToken,
+
+            teacher:{
+               connect:{
+                  id:teacherId
+               }
+            }
+         }
+      })
+
    
-      await newClass.save();
-      const updatedTeacher = await Teachers.findByIdAndUpdate(teacher, { $push: { classes: newClass._id } }, { new: true });
-      res.status(200).json({ message: "Class Created Successfully", inviteTokens });
+   
+      // const updatedTeacher = await Teachers.findByIdAndUpdate(teacherId, { $push: { classes: newClass._id } }, { new: true });
+      const updatedTeacher= await prisma.teacher.update({
+         where:{
+            id:teacherId
+         },
+         data:{
+            classes:{
+               connect:{
+                  id:newClass.id
+               }
+            }
+         }
+      })
+      res.status(200).json({ message: "Class Created Successfully", inviteToken });
       } catch (error) {
          return res.json({error})
       }

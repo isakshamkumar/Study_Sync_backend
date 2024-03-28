@@ -1,11 +1,9 @@
-import express, { Request, Response, Router } from "express";
+import express, {  Router } from "express";
 const router: Router = express.Router();
-import jwt from "jsonwebtoken";
 import authenticateJwtStudent, {
-  RequestWithStudent,
 } from "../middlewares/AuthStudent";
-import { Classes, Projects, Students } from "../models";
-import { SECRETFORSTUDENT } from "../config";
+
+
 import { handleGetClass, handleGetStudentMetaData, handleJoinClass, handleRegisterStudent, handleStudentLogin } from "../controllers/Students";
 
 const multer = require("multer");

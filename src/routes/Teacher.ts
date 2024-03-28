@@ -1,14 +1,11 @@
-import express, { Request, Response, Router } from 'express';
-import { Teachers, Classes } from '../models'
-import jwt from 'jsonwebtoken';
+import express, {  Router } from 'express';
+
 import authenticateJwtTeacher  from '../middlewares/AuthTeacher'; 
-import { SECRETFORTEACHER } from '../config';
 import { handleTeacherCreateClass, handleTeacherSignup } from '../controllers/Teachers';
 import { handleStudentLogin } from '../controllers/Students';
 
 const router: Router = express.Router();
 
-// Define interfaces for request bodies
 
 
 export interface LoginRequestBody {

@@ -19,46 +19,44 @@ const cors_1 = __importDefault(require("cors"));
 const Teacher_1 = __importDefault(require("./routes/Teacher"));
 const Student_1 = __importDefault(require("./routes/Student"));
 const dotenv_1 = __importDefault(require("dotenv"));
-const models_1 = require("./models");
+const Client_1 = __importDefault(require("./prisma/Client"));
+//move zode type to a common folder --->half done
+// add prisma---done
+//change route logic to prisma---doing
+//add features----today
+// import { Colleges, Courses, Projects, Teachers } from "./models";
 dotenv_1.default.config();
 app.use(express_1.default.json());
 app.use((0, cors_1.default)());
 app.use("/teacher", Teacher_1.default);
 app.use("/student", Student_1.default);
-//move zode type to a common folder
-// add prisma
-//change route logic to prisma
-//add features
-mongoose_1.default.connection.on('error', err => {
-    console.log('MongoDb connection error', err);
+mongoose_1.default.connection.on("error", (err) => {
+    console.log("MongoDb connection error", err);
 });
-function connectToDatabase() {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            yield mongoose_1.default.connect(process.env.MONGODB_CONNECTION_STRING || '');
-        }
-        catch (error) {
-            console.error('Error connecting to MongoDB', error);
-        }
-    });
-}
-connectToDatabase();
-const db = mongoose_1.default.connection;
-db.on("error", (error) => console.log("MongoDb connection errror ", error));
-db.once("open", () => console.log("Connected to database"));
+//  async function connectToDatabase() {
+//   try {
+//      await mongoose.connect(process.env.MONGODB_CONNECTION_STRING || '');
+//   } catch (error) {
+//      console.error('Error connecting to MongoDB', error);
+//   }
+//  }
+//  connectToDatabase();
+// const db = mongoose.connection;
+// db.on("error", (error) => console.log("MongoDb connection errror ", error));
+// db.once("open", () => console.log("Connected to database"));
 app.get("/allColleges", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let colleges = yield models_1.Colleges.find({});
+    let colleges = yield Client_1.default.college.findMany({});
     // console.log(colleges);
     res.json({ message: "List of all colleges", colleges });
 }));
 //send all available departments
 app.get("/alldepartments", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let courses = yield models_1.Courses.find({});
+    let courses = yield Client_1.default.course.findMany({});
     // console.log(colleges);
     res.json({ message: "List of all courses", courses });
 }));
 app.get("/allTeachers", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    let teachers = yield models_1.Teachers.find({});
+    let teachers = yield Client_1.default.teacher.findMany({});
     // console.log(colleges);
     res.json({ message: "List of all teachers", teachers });
 }));
@@ -81,14 +79,13 @@ app.get("/portal/seeProject?keyword", (req, res) => __awaiter(void 0, void 0, vo
             .json({ error: "The 'keyword' parameter must be a string." });
     }
     const keyword = req.query.keyword.toLowerCase();
-    const projects = yield models_1.Projects.find({
-        $or: [{ tags: { $in: [keyword] } }],
-    }).select("-content");
-    if (!projects) {
-        res.status(404).json("No Projects Found");
-    }
-    else {
-        res.json(projects);
-    }
+    //   const projects = await Projects.find({
+    //     $or: [{ tags: { $in: [keyword] } }],
+    //   }).select("-content");
+    //   if (!projects) {
+    //     res.status(404).json("No Projects Found");
+    //   } else {
+    //     res.json(projects);
+    //   }
 }));
 app.listen(3000, () => console.log("Server running on port 3000"));

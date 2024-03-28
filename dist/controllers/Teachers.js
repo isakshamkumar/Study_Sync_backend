@@ -14,7 +14,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleTeacherCreateClass = exports.handleTeacherLogin = exports.handleTeacherSignup = void 0;
 const config_1 = require("../config");
-const models_1 = require("../models");
+const Client_1 = __importDefault(require("../prisma/Client"));
+const uuid_1 = require("uuid");
+// import { Classes, Teachers } from '../models';
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const zod_1 = require("zod");
 const TeacherRegisterSchema = zod_1.z.object({
@@ -54,23 +56,23 @@ const handleTeacherSignup = (req, res) => __awaiter(void 0, void 0, void 0, func
         const { name, password, college, email, dept, contactNumber, } = TeacherRegisterSchema.parse(req.body);
         try {
             // Use bcrypt
-            const teacher = yield models_1.Teachers.findOne({ email });
+            const teacher = yield (Client_1.default === null || Client_1.default === void 0 ? void 0 : Client_1.default.teacher.findUnique({
+                where: {
+                    email: email,
+                },
+            }));
             if (teacher) {
                 return res.status(403).send({ message: "Teacher already exists" });
             }
             else {
-                const newTeacher = new models_1.Teachers({
-                    name,
-                    password,
-                    email,
-                    college,
-                    dept,
-                    contactNumber,
-                    classes: [],
-                    projectsRecieved: [],
-                });
-                yield newTeacher.save();
-                const token = jsonwebtoken_1.default.sign({ teacher: newTeacher._id }, config_1.SECRETFORTEACHER, {
+                const newTeacher = yield (Client_1.default === null || Client_1.default === void 0 ? void 0 : Client_1.default.teacher.create({
+                    data: {
+                        name,
+                        password,
+                        email,
+                    }
+                }));
+                const token = jsonwebtoken_1.default.sign({ teacher: newTeacher.id }, config_1.SECRETFORTEACHER, {
                     expiresIn: '1h',
                 });
                 return res.json({ message: 'Teacher created successfully', token });
@@ -89,10 +91,15 @@ exports.handleTeacherSignup = handleTeacherSignup;
 const handleTeacherLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { password, email } = TeacherLoginSchema.parse(req.body);
-        const teacher = yield models_1.Teachers.findOne({ name, password, email }).populate("college");
+        const teacher = yield Client_1.default.teacher.findUnique({
+            where: {
+                email,
+                password
+            }
+        });
         if (teacher) {
-            const token = jsonwebtoken_1.default.sign({ teacher: teacher._id }, config_1.SECRETFORTEACHER, { expiresIn: '1h' });
-            res.json({ message: "Logged In Successfully", token, college: teacher.college });
+            const token = jsonwebtoken_1.default.sign({ teacher: teacher.id }, config_1.SECRETFORTEACHER, { expiresIn: '1h' });
+            res.json({ message: "Logged In Successfully", token });
         }
         else {
             res.status(403).json({ message: 'Teacher not found' });
@@ -107,17 +114,38 @@ const handleTeacherCreateClass = (req, res) => __awaiter(void 0, void 0, void 0,
     try {
         const { nameOfClass } = TeacherCreateClassSchema.parse(req.body);
         //@ts-ignore
-        const teacher = req.teacher;
+        const teacherId = req.teacher;
         if (!nameOfClass) {
             return res.status(500).send("Please enter the details");
         }
         ;
-        const inviteTokens = `${Math.round(Math.random() * 100)}`;
+        const inviteToken = Number((0, uuid_1.v4)());
         let dateCreated = `${new Date()}`;
-        const newClass = new models_1.Classes({ nameOfClass, teacher, dateCreated, students: [], inviteTokens });
-        yield newClass.save();
-        const updatedTeacher = yield models_1.Teachers.findByIdAndUpdate(teacher, { $push: { classes: newClass._id } }, { new: true });
-        res.status(200).json({ message: "Class Created Successfully", inviteTokens });
+        const newClass = yield Client_1.default.class.create({
+            data: {
+                nameOfClass,
+                inviteToken,
+                teacher: {
+                    connect: {
+                        id: teacherId
+                    }
+                }
+            }
+        });
+        // const updatedTeacher = await Teachers.findByIdAndUpdate(teacherId, { $push: { classes: newClass._id } }, { new: true });
+        const updatedTeacher = yield Client_1.default.teacher.update({
+            where: {
+                id: teacherId
+            },
+            data: {
+                classes: {
+                    connect: {
+                        id: newClass.id
+                    }
+                }
+            }
+        });
+        res.status(200).json({ message: "Class Created Successfully", inviteToken });
     }
     catch (error) {
         return res.json({ error });

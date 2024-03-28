@@ -12,11 +12,12 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleProjectUpload = exports.handleJoinClass = exports.handleGetClass = exports.handleStudentLogin = exports.handleRegisterStudent = exports.handleGetStudentMetaData = void 0;
-const models_1 = require("../models");
+exports.handleJoinClass = exports.handleGetClass = exports.handleStudentLogin = exports.handleRegisterStudent = exports.handleGetStudentMetaData = void 0;
+// import { Classes, Projects, Students } from "../models";
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const config_1 = require("../config");
 const zod_1 = require("zod");
+const Client_1 = __importDefault(require("../prisma/Client"));
 const StudentRegisterSchema = zod_1.z.object({
     name: zod_1.z
         .string()
@@ -40,16 +41,22 @@ const StudentLoginSchema = zod_1.z.object({
 });
 //zod schema for handleGet class function
 const getClassSchema = zod_1.z.object({
-    inviteToken: zod_1.z.string()
+    inviteToken: zod_1.z.string(),
 });
 const handleGetStudentMetaData = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     //@ts-ignore
-    const student = yield models_1.Students.findById(req.student)
-        .populate("collegeDetails")
-        .populate("classesJoined")
-        .populate({
-        path: "projectsUploaded",
-        select: "-content",
+    // const student = await Students.findById(req.student)
+    //   .populate("collegeDetails")
+    //   .populate("classesJoined")
+    //   .populate({
+    //     path: "projectsUploaded",
+    //     select: "-content",
+    //   });
+    const student = yield Client_1.default.student.findUnique({
+        where: {
+            //@ts-ignore
+            id: req.student,
+        },
     });
     if (student) {
         res.status(200).json(student);
@@ -64,27 +71,41 @@ const handleRegisterStudent = (req, res) => __awaiter(void 0, void 0, void 0, fu
     try {
         const { name, email, password, enrollmentNumber, collegeId, courseEnrolled, } = StudentRegisterSchema.parse(req.body);
         let studentEnrollmentNumber = parseInt(enrollmentNumber);
-        const existingStudent = yield models_1.Students.findOne({ email });
+        // const existingStudent = await Students.findOne({ email });
+        const existingStudent = yield Client_1.default.student.findUnique({
+            where: {
+                email,
+            },
+        });
         if (existingStudent) {
             res.status(403).json({ message: "Student already exists" });
         }
         else {
-            console.log("reacher here");
-            const collegeDetails = {
-                enrollmentNumber: studentEnrollmentNumber,
-                collegeId,
-                courseEnrolled,
-            };
-            const newStudent = new models_1.Students({
-                name,
-                email,
-                password,
-                collegeDetails,
-                classesJoined: [],
-                projectsUploaded: [],
+            // console.log("reacher here");
+            // const collegeDetails = {
+            //   enrollmentNumber: studentEnrollmentNumber,
+            //   collegeId,
+            //   courseEnrolled,
+            // };
+            // const newStudent = new Students({
+            //   name,
+            //   email,
+            //   password,
+            //   collegeDetails,
+            //   classesJoined: [],
+            //   projectsUploaded: [],
+            // });
+            const newStudent = yield Client_1.default.student.create({
+                data: {
+                    name,
+                    email,
+                    password,
+                    enrollmentNumber: studentEnrollmentNumber,
+                    collegeId,
+                    coursesEnrolledId: courseEnrolled,
+                },
             });
-            yield newStudent.save();
-            const token = jsonwebtoken_1.default.sign({ student: newStudent._id }, config_1.SECRETFORSTUDENT, {
+            const token = jsonwebtoken_1.default.sign({ student: newStudent.id }, config_1.SECRETFORSTUDENT, {
                 expiresIn: "1h",
             });
             res.status(200).json({ message: "Student Created Successfully", token });
@@ -98,9 +119,14 @@ exports.handleRegisterStudent = handleRegisterStudent;
 const handleStudentLogin = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { email, password } = StudentLoginSchema.parse(req.body);
-        const student = yield models_1.Students.findOne({ email, password }).populate("collegeDetails.collegeId");
+        const student = yield Client_1.default.student.findUnique({
+            where: {
+                email,
+                password,
+            },
+        });
         if (student) {
-            const token = jsonwebtoken_1.default.sign({ student: student._id }, config_1.SECRETFORSTUDENT, {
+            const token = jsonwebtoken_1.default.sign({ student: student.id }, config_1.SECRETFORSTUDENT, {
                 expiresIn: "1h",
             });
             res.status(200).json({ message: "Logged In Successfully", token });
@@ -118,19 +144,13 @@ const handleGetClass = (req, res) => __awaiter(void 0, void 0, void 0, function*
     try {
         const { inviteToken } = getClassSchema.parse(req.body);
         ///assuming the invite token will always be unique
-        const availableClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken })
-            .populate("teacher")
-            .populate("students");
+        const availableClass = yield Client_1.default.class.findUnique({
+            where: {
+                inviteToken: Number(inviteToken),
+            },
+        });
         if (availableClass) {
-            const resClass = {
-                _id: availableClass._id,
-                nameOfClass: availableClass.nameOfClass,
-                //@ts-ignore
-                teacher: availableClass.teacher.name,
-                dateCreated: availableClass.dateCreated,
-                students: availableClass.students,
-            };
-            res.json({ message: "class found", resClass });
+            res.json({ message: "class found", availableClass });
         }
         else {
             res.status(400).json({ message: "No Class Found" });
@@ -144,17 +164,55 @@ exports.handleGetClass = handleGetClass;
 const handleJoinClass = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const { inviteToken } = getClassSchema.parse(req.body);
-        const student = yield models_1.Students.findById(req.student);
+        const student = yield Client_1.default.student.findUnique({
+            where: {
+                id: req.student
+            }
+        });
         // console.log(student);
         if (student) {
-            const foundClass = yield models_1.Classes.findOne({ inviteTokens: inviteToken });
+            const foundClass = yield Client_1.default.class.findUnique({ where: { inviteToken: Number(inviteToken) } });
             // console.log(foundClass);
             if (!foundClass) {
                 res.status(400).json({ message: "No Class Found" });
             }
             else {
-                const updatedClass = yield models_1.Classes.findByIdAndUpdate(foundClass._id, { $push: { students: student._id } }, { new: true });
-                const updatedStudent = yield models_1.Students.findByIdAndUpdate(student._id, { $push: { classesJoined: foundClass._id } }, { new: true });
+                // const updatedClass = await prisma.class.findByIdAndUpdate(
+                //   foundClass._id,
+                //   { $push: { students: student._id } },
+                //   { new: true }
+                // );
+                const updatedClass = yield Client_1.default.class.update({
+                    where: {
+                        id: foundClass.id
+                    },
+                    data: {
+                        students: {
+                            connect: {
+                                id: student.id
+                            }
+                        }
+                    }
+                });
+                // console.log(updatedClass);
+                // res.status(200).json({ message: "Class Joined Successfully", updatedClass });
+                // const updatedStudent = await Students.findByIdAndUpdate(
+                //   student._id,
+                //   { $push: { classesJoined: foundClass._id } },
+                //   { new: true }
+                // );
+                const updatedStudent = yield Client_1.default.student.update({
+                    where: {
+                        id: student.id
+                    },
+                    data: {
+                        classesJoined: {
+                            connect: {
+                                id: foundClass.id
+                            }
+                        }
+                    }
+                });
                 res.json({ message: "Class Joined Successfully" });
             }
         }
@@ -168,24 +226,33 @@ const handleJoinClass = (req, res) => __awaiter(void 0, void 0, void 0, function
 });
 exports.handleJoinClass = handleJoinClass;
 //first do file upload then create schema
-const handleProjectUpload = (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    // req.file contains the uploaded file (PDF)
-    // req.body contains other form data (title, description, etc.)
-    const projectData = req.body;
-    const updatedTags = projectData.tags.split(",");
-    projectData.tags = updatedTags;
-    const studentHeader = req.headers.student;
-    const teacherHeader = req.headers.teacher;
-    //@ts-ignore
-    const student = yield models_1.Students.findById(req.student);
-    if (student) {
-        const project = Object.assign(Object.assign({}, projectData), { student: studentHeader, teacher: teacherHeader, isPlagiarized: true, isApproved: false, 
-            //@ts-ignore
-            content: req.file.buffer });
-        const newProject = new models_1.Projects(project);
-        yield newProject.save();
-        const updatedStudent = yield models_1.Students.findByIdAndUpdate(student._id, { $push: { projectsUploaded: newProject._id } }, { new: true });
-        res.json({ message: "Project Uploaded Successfully" });
-    }
-});
-exports.handleProjectUpload = handleProjectUpload;
+// export const handleProjectUpload = async (req: Request, res: Response) => {
+//   // req.file contains the uploaded file (PDF)
+//   // req.body contains other form data (title, description, etc.)
+//   const projectData = req.body;
+//   const updatedTags = projectData.tags.split(",");
+//   projectData.tags = updatedTags;
+//   const studentHeader = req.headers.student;
+//   const teacherHeader = req.headers.teacher;
+//   //@ts-ignore
+//   const student = await Students.findById(req.student);
+//   if (student) {
+//     const project = {
+//       ...projectData, //project data contains tags also which is array of strings
+//       student: studentHeader,
+//       teacher: teacherHeader,
+//       isPlagiarized: true,
+//       isApproved: false,
+//       //@ts-ignore
+//       content: req.file.buffer, // Store the file content as a buffer
+//     };
+//     const newProject = new Projects(project);
+//     await newProject.save();
+//     const updatedStudent = await Students.findByIdAndUpdate(
+//       student._id,
+//       { $push: { projectsUploaded: newProject._id } },
+//       { new: true }
+//     );
+//     res.json({ message: "Project Uploaded Successfully" });
+//   }
+// };

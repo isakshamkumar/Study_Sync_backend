@@ -15,7 +15,7 @@ datasource db {
 
 model Student {
   id                String         @id @default(auto()) @map("_id") @db.ObjectId
-  email             String         @db.String
+  email             String          @unique
   name              String
   password          String
   // collegeDetails
@@ -56,7 +56,7 @@ model Class {
   nameOfClass String
   teacherId   String         @db.ObjectId
   teacher     Teacher        @relation(fields: [teacherId], references: [id])
-  inviteToken Int
+  inviteToken Int      @unique
   students    StudentClass[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
@@ -76,7 +76,7 @@ model StudentClass {
 model Teacher {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   name             String
-  email            String
+  email            String @unique
   password         String
   classes          Class[]
   projectsRecieved Project[]
